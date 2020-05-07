@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+main() {
+	if test $# -ne 1; then
+		printf >&2 'Usage: mars-from-docker <image>\n'
+		exit 1
+	fi
+
+	local mars_ro
+	mars_ro="${XDG_DATA_HOME:-$HOME/.local/share}/mars-ro"
+
+	if test -d "$mars_ro"; then
+		printf >&2 '%s already exists\n' "$mars_ro"
+		exit 1
+	fi
+
+	mkdir -p -- "$mars_ro"
+	#cp -n -- seccomp.bpf "$mars_ro/"
+	mkdir -- "$mars_ro/fs"
+	cd -- "$mars_ro/fs"
+
+	docker create --name=mars-from-docker "$1"
+	docker export mars-from-docker | tar x
+	docker rm mars-from-docker
+
+	mkdir app
+	mkdir usr/local/cargo/registry
+}
+
+main "$@"

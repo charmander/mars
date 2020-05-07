@@ -1,0 +1,50 @@
+#!/bin/sh
+set -eu
+
+main() {
+	local mars_ro
+	mars_ro="${XDG_DATA_HOME:-$HOME/.local/share}/mars-ro"
+
+	touch -a Cargo.lock
+
+	mkdir -p \
+		.mars-rw/cargo-registry \
+		target
+
+	share_net=''
+
+	if test "$1" = --share-net; then
+		share_net=--share-net
+		shift
+	fi
+
+	exec \
+		`#3< "$mars_ro"/seccomp.bpf` \
+		env -i bwrap \
+		--unshare-all \
+		--unshare-user \
+		--unshare-cgroup \
+		$share_net \
+		--new-session \
+		--die-with-parent \
+		`#--seccomp 3` \
+		--hostname sandbox \
+		--ro-bind "$mars_ro/fs" / \
+		--dev /dev \
+		--proc /proc \
+		--tmpfs /tmp \
+		--bind .mars-rw/cargo-registry /usr/local/cargo/registry \
+		--ro-bind . /app \
+		--bind Cargo.lock /app/Cargo.lock \
+		--bind target /app/target \
+		--chdir /app \
+		--setenv HOME / \
+		--setenv PATH /usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+		--setenv RUSTUP_HOME /usr/local/rustup \
+		--setenv CARGO_HOME /usr/local/cargo \
+		--setenv RUST_VERSION 1.42.0 \
+		--setenv TERM xterm-256color \
+		-- "$@"
+}
+
+main "$@"
